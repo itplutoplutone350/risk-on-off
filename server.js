@@ -38,11 +38,10 @@ app.post('/api/analyze', async (req, res) => {
   try {
     const ai = getGeminiClient();
 
-    const prompt = `
-      Analizza le ultime notizie economiche, finanziarie e politiche globali.
-      Assegna un indice numerico di Risk-On / Risk-Off da 1 a 90 (dove 1 è estremo Risk-On ed euforia, e 90 è estremo Risk-Off con panico/paura).
-      Fornisci una breve motivazione di massimo 3-4 frasi in italiano che spiega i fattori principali (geopolitica, banche centrali, mercati).
-    `;
+    const prompt = `Analizza le ultime notizie economiche, finanziarie, politiche e geopolitiche globali. Esamina anche i post più significativi sui social sempre su questi argomenti.
+Assegna un indice numerico di Risk-On / Risk-Off da 1 a 90 (dove 1 è estremo Risk-On ed euforia, e 90 è estremo Risk-Off con panico/paura).
+Fornisci una breve motivazione di massimo 2 frasi in italiano che spiega i fattori principali (geopolitica, banche centrali, mercati, social sentiment).
+  `;
 
     const response = await ai.models.generateContent({
       model: 'gemini-3.8-flash',
