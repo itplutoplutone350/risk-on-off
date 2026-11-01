@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Applicazione Node.js con Express, EJS e Gemini API per monitoraggio Risk On / Risk Off",
   "main": "server.js",
+  "type": "module",
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js"
