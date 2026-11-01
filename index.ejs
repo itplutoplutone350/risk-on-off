@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="it" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Risk On / Risk Off Monitor (Node.js + Vercel)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#0f172a',
+                        cardbg: '#1e293b',
+                    }
+                }
+            }
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-darkbg text-slate-100 min-h-screen flex flex-col font-sans">
+
+    <header class="border-b border-slate-800 bg-cardbg/50 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="bg-blue-600 p-2 rounded-xl text-white font-bold">RO</div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight">Risk On / Risk Off Monitor</h1>
+                    <p class="text-xs text-slate-400">Node.js Express App & Gemini API</p>
+                </div>
+            </div>
+            <span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full font-medium">Full-Stack App</span>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 py-8 flex-grow grid grid-cols-1 lg:grid-cols-3 gap-6 w-full">
+        
+        <div class="space-y-6">
+            <div class="bg-cardbg border border-slate-800 rounded-2xl p-6 shadow-xl">
+                <h2 class="text-lg font-semibold mb-4 text-slate-200">Controllo Analisi</h2>
+                
+                <button id="runBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-xl shadow-lg transition flex items-center justify-center gap-2 cursor-pointer mb-4">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    Esegui Nuova Analisi Ora
+                </button>
+
+                <div class="border-t border-slate-800 pt-4">
+                    <label class="block text-sm font-medium text-slate-300 mb-2">Timer Orario Client-Side:</label>
+                    <select id="timerSelect" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-200 outline-none mb-2">
+                        <option value="0">Disattivato</option>
+                        <option value="60">Ogni 1 ora (Automatico)</option>
+                        <option value="1">Ogni 1 minuto (Test)</option>
+                    </select>
+                    <div id="timerStatus" class="text-xs text-slate-400">Timer spento</div>
+                </div>
+            </div>
+
+            <div class="bg-cardbg border border-slate-800 rounded-2xl p-6 shadow-xl text-center">
+                <h3 class="text-sm font-medium text-slate-400 uppercase tracking-wider mb-2">Indice Attuale (1-90)</h3>
+                <div id="indexDisplay" class="text-6xl font-black text-blue-500 mb-2">
+                    <%= lastAnalysis ? lastAnalysis.index : '--' %>
+                </div>
+                <div id="labelDisplay" class="text-sm font-semibold text-slate-300 mb-4">
+                    <%= lastAnalysis ? lastAnalysis.classification : 'Nessuna analisi disponibile' %>
+                </div>
+                
+                <div class="w-full bg-slate-800 h-3 rounded-full overflow-hidden p-0.5 relative">
+                    <div id="gaugeBar" class="bg-gradient-to-r from-emerald-500 via-yellow-500 to-rose-600 h-full rounded-full transition-all duration-500" 
+                         style="width: <%= lastAnalysis ? (lastAnalysis.index / 90) * 100 : 0 %>%"></div>
+                </div>
+                <div class="flex justify-between text-[10px] text-slate-500 mt-1">
+                    <span>1 (Risk-On)</span>
+                    <span>45 (Neutrale)</span>
+                    <span>90 (Risk-Off)</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="lg:col-span-2 space-y-6">
+            <div class="bg-cardbg border border-slate-800 rounded-2xl p-6 shadow-xl">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-semibold text-slate-200">Grafico Storico Rilevazioni</h2>
+                    <button id="clearBtn" class="text-xs text-rose-400 hover:text-rose-300 underline cursor-pointer">Svuota Storico</button>
+                </div>
+                <div class="relative h-64 w-full">
+                    <canvas id="historyChart"></canvas>
+                </div>
+            </div>
+
+            <div class="bg-cardbg border border-slate-800 rounded-2xl p-6 shadow-xl">
+                <h2 class="text-lg font-semibold text-slate-200 mb-3">Analisi e Motivazione</h2>
+                <div id="reasoningDisplay" class="text-sm text-slate-300 bg-slate-900/50 p-4 rounded-xl border border-slate-800/80 min-h-[120px] whitespace-pre-line">
+                    <%= lastAnalysis ? lastAnalysis.reasoning : 'Clicca su "Esegui Nuova Analisi Ora" per avviare il calcolo.' %>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="border-t border-slate-800 py-4 text-center text-xs text-slate-500">
+        Risk On / Risk Off Monitor &bull; Node.js + Express + Vercel
+    </footer>
+
+    <script>
+        let initialHistory = <%- JSON.stringify(history) %>;
+        let chartInstance = null;
+        let timerInterval = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initChart(initialHistory);
+        });
+
+        function initChart(history) {
+            const ctx = document.getElementById('historyChart').getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: history.map(item => item.time),
+                    datasets: [{
+                        label: 'Indice Risk-Off (1-90)',
+                        data: history.map(item => item.index),
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { min: 1, max: 90, grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#94a3b8' } },
+                        x: { grid: { display: false }, ticks: { color: '#94a3b8', maxTicksLimit: 6 } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        function updateChart(history) {
+            if (!chartInstance) return;
+            chartInstance.data.labels = history.map(item => item.time);
+            chartInstance.data.datasets[0].data = history.map(item => item.index);
+            chartInstance.update();
+        }
+
+        async function triggerAnalysis() {
+            const runBtn = document.getElementById('runBtn');
+            const indexDisplay = document.getElementById('indexDisplay');
+            const labelDisplay = document.getElementById('labelDisplay');
+            const reasoningDisplay = document.getElementById('reasoningDisplay');
+            const gaugeBar = document.getElementById('gaugeBar');
+
+            runBtn.disabled = true;
+            runBtn.textContent = 'Analisi in corso...';
+            reasoningDisplay.textContent = 'Interrogazione di Gemini in corso...';
+
+            try {
+                const response = await fetch('/api/analyze', { method: 'POST' });
+                const data = await response.json();
+
+                if (data.success) {
+                    const record = data.record;
+                    indexDisplay.textContent = record.index;
+                    labelDisplay.textContent = record.classification;
+                    reasoningDisplay.textContent = record.reasoning;
+                    gaugeBar.style.width = `${(record.index / 90) * 100}%`;
+                    updateChart(data.history);
+                } else {
+                    alert('Errore: ' + data.error);
+                }
+            } catch (err) {
+                alert('Errore di connessione: ' + err.message);
+            } finally {
+                runBtn.disabled = false;
+                runBtn.textContent = 'Esegui Nuova Analisi Ora';
+            }
+        }
+
+        document.getElementById('runBtn').addEventListener('click', triggerAnalysis);
+
+        document.getElementById('clearBtn').addEventListener('click', async () => {
+            if (confirm('Vuoi svuotare lo storico delle analisi?')) {
+                await fetch('/api/clear-history', { method: 'POST' });
+                updateChart([]);
+                document.getElementById('indexDisplay').textContent = '--';
+                document.getElementById('labelDisplay').textContent = 'Storico azzerato';
+                document.getElementById('gaugeBar').style.width = '0%';
+                document.getElementById('reasoningDisplay').textContent = 'Storico ripulito.';
+            }
+        });
+
+        document.getElementById('timerSelect').addEventListener('change', (e) => {
+            const minutes = parseInt(e.target.value, 10);
+            const status = document.getElementById('timerStatus');
+            if (timerInterval) clearInterval(timerInterval);
+
+            if (minutes > 0) {
+                status.textContent = `Timer attivo (esecuzione ogni ${minutes} min)`;
+                timerInterval = setInterval(triggerAnalysis, minutes * 60 * 1000);
+            } else {
+                status.textContent = 'Timer spento';
+            }
+        });
+    </script>
+</body>
+</html>
