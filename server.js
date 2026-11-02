@@ -44,7 +44,7 @@ Fornisci una breve motivazione di massimo 2 frasi in italiano che spiega i fatto
   `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: 'gemini-3.5-flash',
       contents: prompt,
       config: {
         responseMimeType: "application/json",
