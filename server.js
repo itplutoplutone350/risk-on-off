@@ -40,11 +40,11 @@ app.post('/api/analyze', async (req, res) => {
 
     const prompt = `Analizza le ultime notizie economiche, finanziarie, politiche e geopolitiche globali. Esamina anche i post più significativi sui social sempre su questi argomenti.
 Assegna un indice numerico di Risk-On / Risk-Off da 1 a 90 (dove 1 è estremo Risk-On ed euforia, e 90 è estremo Risk-Off con panico/paura).
-Fornisci una breve motivazione di massimo 2 frasi in italiano che spiega i fattori principali (geopolitica, banche centrali, mercati, social sentiment).
+Fornisci una breve motivazione di massimo 3 frasi in italiano che spiega i fattori principali (geopolitica, mercati, social sentiment).
   `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-3.5-flash-lite',
       contents: prompt,
       config: {
         responseMimeType: "application/json",
