@@ -1,97 +1,87 @@
 import express from 'express';
-import { GoogleGenAI, Type } from '@google/genai';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { GoogleGenAI } from '@google/genai';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const port = process.env.PORT || 3000;
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
-
+// Configurazione di EJS come motore di template
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json());
 
-let analysisHistory = [];
+// Inizializzazione SDK Google GenAI (legge la chiave dalle variabili d'ambiente di Vercel)
+const ai = new GoogleGenAI();
 
-const getGeminiClient = () => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("Chiave GEMINI_API_KEY non trovata nelle variabili d'ambiente.");
-  }
-  return new GoogleGenAI({ apiKey });
-};
-
+// Rotta principale che carica la pagina EJS
 app.get('/', (req, res) => {
-  const lastAnalysis = analysisHistory.length > 0 ? analysisHistory[analysisHistory.length - 1] : null;
-  res.render('index', { 
-    lastAnalysis, 
-    history: analysisHistory 
-  });
+    res.render('index');
 });
 
-app.post('/api/analyze', async (req, res) => {
-  try {
-    const ai = getGeminiClient();
+// Rotta API per eseguire l'analisi con Gemini
+app.get('/api/analyze', async (req, res) => {
+    try {
+        const promptText = `
+Analizza le ultime notizie economiche, finanziarie, politiche e geopolitiche globali, esaminando anche i post più significativi sui social. 
+Puntualizza in modo particolare l'analisi sullo stato economico dell'Italia, sulle notizie macroeconomiche italiane (inflazione, PIL, manovre di bilancio, debito pubblico) e sull'impatto specifico sui seguenti asset e categorie:
+- Azioni e Utility italiane/europee: A2A (A2A), Avio (AVIO), Banca Ifis (IF), BNP Paribas (BNP), Credit Agricole (ACA), Edison risp. (EDNR), Enel (ENEL), Eni (ENI), Hera (HER), Italgas (IG), Poste Italiane (PST), Snam (SRG), STMicroelectronics (SGM), Tenaris (TW10), Terna (TRN).
+- ETF tematici e di reddito/dividendi: Global X Euro Stoxx 50 Covered Call (SYLD), Invesco US Energy Infrastructure MLP (MLPD), iShares Developed Markets Property Yield (IQQ6), JPM Europe Equity Premium Income (JEPE), JPM Global Equity Premium Income (JEPG), JPM US Equity Premium Income (JEPI), Vanguard FTSE All-World High Dividend Yield (VGWD).
+- Obbligazionario: BTP a medio-lungo termine e obbligazioni sovrane austriache a lungo termine.
 
-    const prompt = `Analizza le ultime notizie, in particolare di oggi,economiche, finanziarie, politiche e geopolitiche globali ma poi anche italiane. Esamina anche i post più significativi sui social sempre su questi argomenti.
-Assegna un indice numerico di Risk-On / Risk-Off da 1 a 90 (dove 1 è estremo Risk-On ed euforia, e 90 è estremo Risk-Off con panico/paura).
-Fornisci una breve motivazione di massimo 4 frasi in italiano che spiega i fattori principali (geopolitica, mercati, social sentiment).
-  `;
+Assegna un indice numerico complessivo di Risk-On / Risk-Off da 1 a 90 (dove 1 è estremo Risk-On ed euforia, e 90 è estremo Risk-Off con panico/paura).
+Fornisci una breve motivazione in italiano di massimo 3 frasi che spieghi i fattori chiave di mercato, l'economia italiana, le banche centrali e l'impatto su questo portafoglio specifico.
+        `.trim();
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash-lite',
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            indexValue: { type: Type.INTEGER, description: "Valore numerico dell'indice da 1 a 90" },
-            classification: { type: Type.STRING, description: "Etichetta breve, es. Moderatamente Risk-Off" },
-            reasoning: { type: Type.STRING, description: "Motivazione dettagliata in italiano" }
-          },
-          required: ["indexValue", "classification", "reasoning"]
+        const response = await ai.models.generateContent({
+            model: 'gemini-3.8-flash',
+            contents: [
+                {
+                    role: 'user',
+                    parts: [{ text: promptText }]
+                }
+            ],
+            config: {
+                responseMimeType: 'application/json',
+                responseSchema: {
+                    type: "OBJECT",
+                    properties: {
+                        score: {
+                            type: "NUMBER",
+                            description: "Un numero compreso tra 1 e 90 che rappresenta l'indice Risk-On / Risk-Off."
+                        },
+                        motivation: {
+                            type: "STRING",
+                            description: "Breve motivazione in italiano di massimo 3 frasi incentrata anche sull'economia italiana e i titoli."
+                        }
+                    },
+                    required: ["score", "motivation"]
+                }
+            }
+        });
+
+        const data = JSON.parse(response.text);
+        res.json({ success: true, data });
+
+    } catch (error) {
+        console.error("Errore durante l'analisi:", error);
+        let errorMsg = error.message;
+        if (errorMsg.includes('429') || errorMsg.includes('Too Many Requests')) {
+            errorMsg = "Troppe richieste inviate a Gemini in pochi secondi. Attendi un momento e riprova.";
         }
-      }
-    });
-
-    const result = JSON.parse(response.text);
-    const now = new Date();
-    const timeString = now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) + ' ' + now.toLocaleDateString('it-IT');
-
-    const newRecord = {
-      id: Date.now(),
-      time: timeString,
-      index: result.indexValue,
-      classification: result.classification,
-      reasoning: result.reasoning
-    };
-
-    analysisHistory.push(newRecord);
-    if (analysisHistory.length > 50) analysisHistory.shift();
-
-    return res.json({ success: true, record: newRecord, history: analysisHistory });
-
-  } catch (error) {
-    console.error('Errore durante l\'analisi:', error);
-    return res.status(500).json({ success: false, error: error.message });
-  }
+        res.status(500).json({ success: false, error: errorMsg });
+    }
 });
 
-app.post('/api/clear-history', (req, res) => {
-  analysisHistory = [];
-  res.json({ success: true });
-});
-
+// Avvio del server (per test in locale)
 if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, () => {
-    console.log(`Server attivo su http://localhost:${PORT}`);
-  });
+    app.listen(port, () => {
+        console.log(`Server avviato sulla porta ${port}`);
+    });
 }
 
 export default app;
