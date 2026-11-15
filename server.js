@@ -23,10 +23,10 @@ app.get('/', (req, res) => {
 app.get('/api/analyze', async (req, res) => {
     try {
         const firstPrompt = `
-Analizza le ultime notizie economiche, finanziarie, politiche e geopolitiche globali, esaminando anche i post più significativi sui social. 
+Analizza le ultime notizie economiche odierne, finanziarie, politiche e geopolitiche globali, esaminando anche i post più significativi sui social. 
 Puntualizza in modo particolare l'analisi sullo stato economico dell'Italia, sulle notizie macroeconomiche italiane (inflazione, PIL, manovre di bilancio, debito pubblico).
 Assegna un indice numerico complessivo di Risk-On / Risk-Off da 1 a 90 con dedicmale a 1 cifra (dove 1 è estremo Risk-On ed euforia, e 90 è estremo Risk-Off con panico/paura).
-Fornisci una breve motivazione in italiano di massimo 3 frasi che spieghi i fattori chiave di mercato, l'economia italiana e le banche centrali.
+Fornisci una breve motivazione in italiano di massimo 5 frasi che spieghi i fattori chiave di mercato, l'economia italiana e le banche centrali.
         `.trim();
 
         const response1 = await ai.models.generateContent({
@@ -58,7 +58,7 @@ Restituisci un array JSON puro contenente la lista di tutti i titoli analizzati.
 - "name": Nome del titolo o ETF
 - "ticker": Ticker identificativo
 - "action": Esattamente una tra "Buy", "Hold", "Sell"
-- "reason": Breve motivazione (massimo 1 frase)
+- "reason": Breve motivazione (massimo 2 frasi)
         `.trim();
 
         const response2 = await ai.models.generateContent({
