@@ -9,28 +9,23 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Configurazione di EJS come motore di template
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// Inizializzazione SDK Google GenAI (usiamo il modello Flash-Lite per massima fluidità e zero blocchi 429)
 const ai = new GoogleGenAI();
 
-// Rotta principale che carica la pagina EJS
 app.get('/', (req, res) => {
     res.render('index');
 });
 
-// Rotta API per eseguire la doppia chiamata (Analisi Risk + Tabella Titoli Buy/Hold/Sell)
 app.get('/api/analyze', async (req, res) => {
     try {
-        // --- CHIAMATA 1: Analisi Macro, Italia e Indice Risk-On / Risk-Off ---
         const firstPrompt = `
 Analizza le ultime notizie economiche, finanziarie, politiche e geopolitiche globali, esaminando anche i post più significativi sui social. 
 Puntualizza in modo particolare l'analisi sullo stato economico dell'Italia, sulle notizie macroeconomiche italiane (inflazione, PIL, manovre di bilancio, debito pubblico).
-Assegna un indice numerico complessivo di Risk-On / Risk-Off da 1 a 90 (dove 1 è estremo Risk-On ed euforia, e 90 è estremo Risk-Off con panico/paura).
+Assegna un indice numerico complessivo di Risk-On / Risk-Off da 1 a 90 con dedicmale a 1 cifra (dove 1 è estremo Risk-On ed euforia, e 90 è estremo Risk-Off con panico/paura).
 Fornisci una breve motivazione in italiano di massimo 3 frasi che spieghi i fattori chiave di mercato, l'economia italiana e le banche centrali.
         `.trim();
 
@@ -52,7 +47,6 @@ Fornisci una breve motivazione in italiano di massimo 3 frasi che spieghi i fatt
 
         const macroData = JSON.parse(response1.text);
 
-        // --- CHIAMATA 2: Valutazione dei singoli titoli basata sull'output della prima chiamata ---
         const secondPrompt = `
 Considerando l'analisi di mercato e il contesto di rischio appena calcolato (Score Risk: ${macroData.score}/90 - Sintesi: "${macroData.motivation}"), 
 valuta ciascuno dei seguenti asset e titoli specifici fornendo un'indicazione sintetica tra "Buy", "Hold" o "Sell" e una breve motivazione tecnica legata al momento di mercato:
@@ -88,9 +82,15 @@ Restituisci un array JSON puro contenente la lista di tutti i titoli analizzati.
             }
         });
 
-        const titoliData = JSON.parse(response2.text);
+        let titoliData = JSON.parse(response2.text);
 
-        // Invio dei dati completi al frontend
+        const orderPriority = { "SELL": 1, "BUY": 2, "HOLD": 3 };
+        titoliData.sort((a, b) => {
+            const pA = orderPriority[(a.action || "").trim().toUpperCase()] || 4;
+            const pB = orderPriority[(b.action || "").trim().toUpperCase()] || 4;
+            return pA - pB;
+        });
+
         res.json({
             success: true,
             data: {
@@ -110,7 +110,6 @@ Restituisci un array JSON puro contenente la lista di tutti i titoli analizzati.
     }
 });
 
-// Avvio del server (per test in locale)
 if (process.env.NODE_ENV !== 'production') {
     app.listen(port, () => {
         console.log(`Server avviato sulla porta ${port}`);
