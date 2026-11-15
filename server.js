@@ -38,7 +38,7 @@ Fornisci una breve motivazione in italiano di massimo 3 frasi che spieghi i fatt
         `.trim();
 
         const response = await ai.models.generateContent({
-            model: 'gemini-3.8-flash',
+            model: 'gemini-3.5-flash-lite',
             contents: [
                 {
                     role: 'user',
