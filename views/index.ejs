@@ -3,40 +3,67 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Risk On / Risk Off Monitor</title>
+    <title>Risk On / Risk Off Monitor & Asset Rating</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="bg-gray-900 text-white p-6 flex flex-col items-center justify-center min-h-screen">
+<body class="bg-gray-900 text-white p-6 flex flex-col items-center min-h-screen">
 
-    <div class="max-w-2xl w-full bg-gray-800 p-6 rounded-2xl shadow-xl border border-gray-700">
-        <h1 class="text-2xl font-bold mb-4 text-center">Risk On / Risk Off Monitor</h1>
+    <div class="max-w-4xl w-full space-y-6">
         
-        <!-- Pulsante di Analisi -->
-        <div class="flex justify-center mb-6">
-            <button onclick="eseguiAnalisi()" id="btn-analizza" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6 py-3 rounded-xl transition shadow-lg">
-                Esegui Nuova Analisi Ora
-            </button>
+        <!-- Intestazione e Pulsante -->
+        <div class="bg-gray-800 p-6 rounded-2xl shadow-xl border border-gray-700 text-center">
+            <h1 class="text-2xl font-bold mb-4">Risk On / Risk Off Monitor & Portafoglio Italia</h1>
+            <div class="flex justify-center">
+                <button onclick="eseguiAnalisi()" id="btn-analizza" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6 py-3 rounded-xl transition shadow-lg">
+                    Esegui Nuova Analisi Completa
+                </button>
+            </div>
+            <!-- Stato di Caricamento -->
+            <div id="loading" class="hidden text-yellow-400 mt-4 animate-pulse">
+                Elaborazione doppia analisi in corso (Macroeconomia, Italia e Titoli)...
+            </div>
         </div>
 
-        <!-- Stato di Caricamento -->
-        <div id="loading" class="hidden text-center text-yellow-400 mb-4 animate-pulse">
-            Analisi in corso su titoli, BTP e mercati globali tramite Gemini...
-        </div>
-
-        <!-- Sezione Risultato Corrente -->
-        <div class="bg-gray-900 p-4 rounded-xl mb-6 border border-gray-700">
+        <!-- Sezione Risultato Corrente Macro -->
+        <div class="bg-gray-800 p-6 rounded-2xl shadow-xl border border-gray-700">
             <h2 class="text-lg font-semibold text-gray-300 mb-2">Ultimo Stato Rilevato</h2>
             <p class="text-xl font-bold mb-1">Indice Score: <span id="current-score" class="text-blue-400">-</span> / 90</p>
             <p class="text-sm text-gray-400" id="current-motivation">Nessuna analisi disponibile</p>
         </div>
 
         <!-- Grafico Storico -->
-        <div class="relative h-64 w-full">
-            <canvas id="riskChart"></canvas>
+        <div class="bg-gray-800 p-6 rounded-2xl shadow-xl border border-gray-700">
+            <h2 class="text-lg font-semibold text-gray-300 mb-4">Storico Indice Risk</h2>
+            <div class="relative h-64 w-full">
+                <canvas id="riskChart"></canvas>
+            </div>
         </div>
+
+        <!-- Tabella Giudizi Titoli / Asset -->
+        <div class="bg-gray-800 p-6 rounded-2xl shadow-xl border border-gray-700">
+            <h2 class="text-lg font-semibold text-gray-300 mb-4">Analisi e Indicazioni sui Titoli</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-gray-700 text-gray-400 text-sm">
+                            <th class="p-3">Asset / Titolo</th>
+                            <th class="p-3">Ticker</th>
+                            <th class="p-3 text-center">Giudizio</th>
+                            <th class="p-3">Motivazione</th>
+                        </tr>
+                    </thead>
+                    <tbody id="titoli-table-body" class="divide-y divide-gray-700 text-sm">
+                        <tr>
+                            <td colspan="4" class="p-4 text-center text-gray-500">Nessun dato sui titoli caricato. Clicca su "Esegui Nuova Analisi Completa".</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
     </div>
 
     <script>
@@ -89,8 +116,47 @@
             });
         }
 
-        // Funzione per aggiornare interfaccia e storico nel localStorage
-        function aggiornaInterfaccia(history) {
+        // Popola la tabella dei titoli colorando Buy (Verde), Hold (Bianco), Sell (Rosso)
+        function renderTitoliTable(titoli) {
+            const tbody = document.getElementById('titoli-table-body');
+            tbody.innerHTML = '';
+
+            if (!titoli || titoli.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-gray-500">Nessun dato disponibile.</td></tr>`;
+                return;
+            }
+
+            titoli.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-750 transition";
+
+                let badgeColor = "text-white bg-gray-700"; // Default Hold
+                const actionUpper = (item.action || "").trim().toUpperCase();
+
+                if (actionUpper === "BUY") {
+                    badgeColor = "text-green-400 font-bold bg-green-950/40 border border-green-800";
+                } else if (actionUpper === "SELL") {
+                    badgeColor = "text-red-400 font-bold bg-red-950/40 border border-red-800";
+                } else {
+                    badgeColor = "text-white font-semibold bg-gray-700/50 border border-gray-600";
+                }
+
+                tr.innerHTML = `
+                    <td class="p-3 font-medium">${item.name}</td>
+                    <td class="p-3 text-gray-400 font-mono text-xs">${item.ticker}</td>
+                    <td class="p-3 text-center">
+                        <span class="px-3 py-1 rounded-full text-xs ${badgeColor}">
+                            ${item.action}
+                        </span>
+                    </td>
+                    <td class="p-3 text-gray-300 text-xs">${item.reason}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Aggiorna l'interfaccia e salva nel localStorage
+        function aggiornaInterfaccia(history, ultimiTitoli) {
             if (!history || history.length === 0) return;
 
             const ultimo = history[history.length - 1];
@@ -98,6 +164,9 @@
             document.getElementById('current-motivation').innerText = ultimo.motivation;
 
             initChart(history);
+            if (ultimiTitoli) {
+                renderTitoliTable(ultimiTitoli);
+            }
         }
 
         // Funzione richiamata dal pulsante
@@ -117,7 +186,8 @@
                     const nuovoPunto = {
                         date: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString(),
                         score: result.data.score,
-                        motivation: result.data.motivation
+                        motivation: result.data.motivation,
+                        titoli: result.data.titoli
                     };
 
                     // Salva nello storico del localStorage del browser
@@ -125,11 +195,11 @@
                     history.push(nuovoPunto);
 
                     if (history.length > 30) {
-                        history = history.slice(-30); // Mantiene gli ultimi 30 punti
+                        history = history.slice(-30);
                     }
 
                     localStorage.setItem('risk_history', JSON.stringify(history));
-                    aggiornaInterfaccia(history);
+                    aggiornaInterfaccia(history, result.data.titoli);
                 } else {
                     alert('Errore: ' + (result.error || 'Impossibile completare l\'analisi'));
                 }
@@ -143,11 +213,12 @@
             }
         }
 
-        // Al caricamento della pagina, carica i dati salvati nel browser
+        // Al caricamento della pagina, ripristina lo storico e l'ultima tabella salvata
         window.addEventListener('DOMContentLoaded', () => {
             const savedHistory = JSON.parse(localStorage.getItem('risk_history')) || [];
             if (savedHistory.length > 0) {
-                aggiornaInterfaccia(savedHistory);
+                const ultimoElemento = savedHistory[savedHistory.length - 1];
+                aggiornaInterfaccia(savedHistory, ultimoElemento.titoli);
             }
         });
     </script>
