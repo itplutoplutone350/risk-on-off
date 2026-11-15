@@ -15,7 +15,7 @@ app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// Inizializzazione SDK Google GenAI (legge la chiave dalle variabili d'ambiente di Vercel)
+// Inizializzazione SDK Google GenAI (usiamo il modello Flash-Lite per massima fluidità e zero blocchi 429)
 const ai = new GoogleGenAI();
 
 // Rotta principale che carica la pagina EJS
@@ -23,52 +23,85 @@ app.get('/', (req, res) => {
     res.render('index');
 });
 
-// Rotta API per eseguire l'analisi con Gemini
+// Rotta API per eseguire la doppia chiamata (Analisi Risk + Tabella Titoli Buy/Hold/Sell)
 app.get('/api/analyze', async (req, res) => {
     try {
-        const promptText = `
+        // --- CHIAMATA 1: Analisi Macro, Italia e Indice Risk-On / Risk-Off ---
+        const firstPrompt = `
 Analizza le ultime notizie economiche, finanziarie, politiche e geopolitiche globali, esaminando anche i post più significativi sui social. 
-Puntualizza in modo particolare l'analisi sullo stato economico dell'Italia, sulle notizie macroeconomiche italiane (inflazione, PIL, manovre di bilancio, debito pubblico) e sull'impatto specifico sui seguenti asset e categorie:
-- Azioni e Utility italiane/europee: A2A (A2A), Avio (AVIO), Banca Ifis (IF), BNP Paribas (BNP), Credit Agricole (ACA), Edison risp. (EDNR), Enel (ENEL), Eni (ENI), Hera (HER), Italgas (IG), Poste Italiane (PST), Snam (SRG), STMicroelectronics (SGM), Tenaris (TW10), Terna (TRN).
-- ETF tematici e di reddito/dividendi: Global X Euro Stoxx 50 Covered Call (SYLD), Invesco US Energy Infrastructure MLP (MLPD), iShares Developed Markets Property Yield (IQQ6), JPM Europe Equity Premium Income (JEPE), JPM Global Equity Premium Income (JEPG), JPM US Equity Premium Income (JEPI), Vanguard FTSE All-World High Dividend Yield (VGWD).
-- Obbligazionario: BTP a medio-lungo termine e obbligazioni sovrane austriache a lungo termine.
-
+Puntualizza in modo particolare l'analisi sullo stato economico dell'Italia, sulle notizie macroeconomiche italiane (inflazione, PIL, manovre di bilancio, debito pubblico).
 Assegna un indice numerico complessivo di Risk-On / Risk-Off da 1 a 90 (dove 1 è estremo Risk-On ed euforia, e 90 è estremo Risk-Off con panico/paura).
-Fornisci una breve motivazione in italiano di massimo 3 frasi che spieghi i fattori chiave di mercato, l'economia italiana, le banche centrali e l'impatto su questo portafoglio specifico.
+Fornisci una breve motivazione in italiano di massimo 3 frasi che spieghi i fattori chiave di mercato, l'economia italiana e le banche centrali.
         `.trim();
 
-        const response = await ai.models.generateContent({
+        const response1 = await ai.models.generateContent({
             model: 'gemini-3.5-flash-lite',
-            contents: [
-                {
-                    role: 'user',
-                    parts: [{ text: promptText }]
-                }
-            ],
+            contents: [{ role: 'user', parts: [{ text: firstPrompt }] }],
             config: {
                 responseMimeType: 'application/json',
                 responseSchema: {
                     type: "OBJECT",
                     properties: {
-                        score: {
-                            type: "NUMBER",
-                            description: "Un numero compreso tra 1 e 90 che rappresenta l'indice Risk-On / Risk-Off."
-                        },
-                        motivation: {
-                            type: "STRING",
-                            description: "Breve motivazione in italiano di massimo 3 frasi incentrata anche sull'economia italiana e i titoli."
-                        }
+                        score: { type: "NUMBER", description: "Indice Risk-On / Risk-Off da 1 a 90." },
+                        motivation: { type: "STRING", description: "Breve motivazione in italiano." }
                     },
                     required: ["score", "motivation"]
                 }
             }
         });
 
-        const data = JSON.parse(response.text);
-        res.json({ success: true, data });
+        const macroData = JSON.parse(response1.text);
+
+        // --- CHIAMATA 2: Valutazione dei singoli titoli basata sull'output della prima chiamata ---
+        const secondPrompt = `
+Considerando l'analisi di mercato e il contesto di rischio appena calcolato (Score Risk: ${macroData.score}/90 - Sintesi: "${macroData.motivation}"), 
+valuta ciascuno dei seguenti asset e titoli specifici fornendo un'indicazione sintetica tra "Buy", "Hold" o "Sell" e una breve motivazione tecnica legata al momento di mercato:
+- Azioni e Utility: A2A (A2A), Avio (AVIO), Banca Ifis (IF), BNP Paribas (BNP), Credit Agricole (ACA), Edison risp. (EDNR), Enel (ENEL), Eni (ENI), Hera (HER), Italgas (IG), Poste Italiane (PST), Snam (SRG), STMicroelectronics (SGM), Tenaris (TW10), Terna (TRN).
+- ETF tematici e di reddito: Global X Euro Stoxx 50 Covered Call (SYLD), Invesco US Energy Infrastructure MLP (MLPD), iShares Developed Markets Property Yield (IQQ6), JPM Europe Equity Premium Income (JEPE), JPM Global Equity Premium Income (JEPG), JPM US Equity Premium Income (JEPI), Vanguard FTSE All-World High Dividend Yield (VGWD).
+- Obbligazionario: BTP a medio-lungo termine e obbligazioni sovrane austriache a lungo termine.
+
+Restituisci un array JSON puro contenente la lista di tutti i titoli analizzati. Per ciascun elemento includi:
+- "name": Nome del titolo o ETF
+- "ticker": Ticker identificativo
+- "action": Esattamente una tra "Buy", "Hold", "Sell"
+- "reason": Breve motivazione (massimo 1 frase)
+        `.trim();
+
+        const response2 = await ai.models.generateContent({
+            model: 'gemini-3.5-flash-lite',
+            contents: [{ role: 'user', parts: [{ text: secondPrompt }] }],
+            config: {
+                responseMimeType: 'application/json',
+                responseSchema: {
+                    type: "ARRAY",
+                    items: {
+                        type: "OBJECT",
+                        properties: {
+                            name: { type: "STRING" },
+                            ticker: { type: "STRING" },
+                            action: { type: "STRING", description: "Deve essere Buy, Hold o Sell" },
+                            reason: { type: "STRING" }
+                        },
+                        required: ["name", "ticker", "action", "reason"]
+                    }
+                }
+            }
+        });
+
+        const titoliData = JSON.parse(response2.text);
+
+        // Invio dei dati completi al frontend
+        res.json({
+            success: true,
+            data: {
+                score: macroData.score,
+                motivation: macroData.motivation,
+                titoli: titoliData
+            }
+        });
 
     } catch (error) {
-        console.error("Errore durante l'analisi:", error);
+        console.error("Errore durante la doppia analisi:", error);
         let errorMsg = error.message;
         if (errorMsg.includes('429') || errorMsg.includes('Too Many Requests')) {
             errorMsg = "Troppe richieste inviate a Gemini in pochi secondi. Attendi un momento e riprova.";
