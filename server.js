@@ -49,7 +49,7 @@ Fornisci una breve motivazione in italiano di massimo 5 frasi che spieghi i fatt
 
         const secondPrompt = `
 Considerando l'analisi di mercato e il contesto di rischio appena calcolato (Score Risk: ${macroData.score}/90 - Sintesi: "${macroData.motivation}"), 
-valuta ciascuno dei seguenti asset e titoli specifici fornendo un'indicazione sintetica tra "Buy", "Hold" o "Sell" e una breve motivazione tecnica legata al momento di mercato:
+valuta ciascuno dei seguenti asset e titoli specifici fornendo un'indicazione sintetica tra "Buy", "Hold" o "Sell" e una breve motivazione tecnica legata al momento di mercato ma anche al livello di prezzo odierno:
 - Azioni e Utility: A2A (A2A), Avio (AVIO), Banca Ifis (IF), BNP Paribas (BNP), Credit Agricole (ACA), Edison risp. (EDNR), Enel (ENEL), Eni (ENI), Hera (HER), Italgas (IG), Poste Italiane (PST), Snam (SRG), STMicroelectronics (SGM), Tenaris (TW10), Terna (TRN).
 - ETF tematici e di reddito: Global X Euro Stoxx 50 Covered Call (SYLD), Invesco US Energy Infrastructure MLP (MLPD), iShares Developed Markets Property Yield (IQQ6), JPM Europe Equity Premium Income (JEPE), JPM Global Equity Premium Income (JEPG), JPM US Equity Premium Income (JEPI), Vanguard FTSE All-World High Dividend Yield (VGWD).
 - Obbligazionario: BTP a medio-lungo termine e obbligazioni sovrane austriache a lungo termine.
