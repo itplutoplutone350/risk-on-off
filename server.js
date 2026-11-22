@@ -23,7 +23,7 @@ app.get('/', (req, res) => {
 app.get('/api/analyze', async (req, res) => {
     try {
         const firstPrompt = `
-Analizza le ultime notizie economiche odierne,non essere pigro e indaga a fondo tra finanziarie, politiche e geopolitiche globali, esaminando anche i post più significativi sui social. 
+Analizza le ultime notizie economiche odierne,non essere pigro e indaga a fondo tra finanziarie, politiche e geopolitiche globali, esaminando anche i post più significativi sui social e l'andamento dei principali indici.
 Puntualizza in modo particolare l'analisi sullo stato economico dell'Italia, sulle notizie macroeconomiche italiane (inflazione, PIL, manovre di bilancio, debito pubblico).
 Assegna un indice numerico complessivo di Risk-On / Risk-Off da 1 a 90 con dedicmale a 1 cifra (dove 1 è estremo Risk-On ed euforia, e 90 è estremo Risk-Off con panico/paura).
 Fornisci una breve motivazione in italiano di massimo 5 frasi che spieghi i fattori chiave di mercato, l'economia italiana e le banche centrali.
@@ -48,7 +48,7 @@ Fornisci una breve motivazione in italiano di massimo 5 frasi che spieghi i fatt
         const macroData = JSON.parse(response1.text);
 
         const secondPrompt = `
-Considerando l'analisi di mercato e il contesto di rischio appena calcolato (Score Risk: ${macroData.score}/90 - Sintesi: "${macroData.motivation}"), 
+Considerando l'analisi di mercato, andamento principali indici e il contesto di rischio appena calcolato (Score Risk: ${macroData.score}/90 - Sintesi: "${macroData.motivation}"), 
 valuta ciascuno dei seguenti asset e titoli specifici fornendo un'indicazione sintetica tra "Buy", "Hold" o "Sell" e una breve motivazione tecnica legata al momento di mercato ma anche al livello di prezzo odierno:
 - Azioni e Utility: A2A (A2A), Avio (AVIO), Banca Ifis (IF), BNP Paribas (BNP), Credit Agricole (ACA), Edison risp. (EDNR), Enel (ENEL), Eni (ENI), Hera (HER), Italgas (IG), Poste Italiane (PST), Snam (SRG), STMicroelectronics (SGM), Tenaris (TW10), Terna (TRN).
 - ETF tematici e di reddito: Global X Euro Stoxx 50 Covered Call (SYLD), Invesco US Energy Infrastructure MLP (MLPD), iShares Developed Markets Property Yield (IQQ6), JPM Europe Equity Premium Income (JEPE), JPM Global Equity Premium Income (JEPG), JPM US Equity Premium Income (JEPI), Vanguard FTSE All-World High Dividend Yield (VGWD).
