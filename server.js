@@ -23,10 +23,10 @@ app.get('/', (req, res) => {
 app.get('/api/analyze', async (req, res) => {
     try {
         const firstPrompt = `
-Analizza le ultime notizie economiche odierne,non essere pigro e indaga a fondo tra finanziarie, politiche e geopolitiche globali, esaminando anche i post più significativi sui social e l'andamento dei principali indici.
-Puntualizza in modo particolare l'analisi sullo stato economico dell'Italia, sulle notizie macroeconomiche italiane (inflazione, PIL, manovre di bilancio, debito pubblico).
-Assegna un indice numerico complessivo di Risk-On / Risk-Off da 1 a 90 con dedicmale a 1 cifra (dove 1 è estremo Risk-On ed euforia, e 90 è estremo Risk-Off con panico/paura).
-Fornisci una breve motivazione in italiano di massimo 5 frasi che spieghi i fattori chiave di mercato, l'economia italiana e le banche centrali.
+Analizza andamento dei principali indici futures come us 500, us tech 100 e DAX, quindi le ultime notizie economiche odierne, politiche e geopolitiche globali, esaminando anche i post più significativi sui social e l'andamento dei principali indici.
+Puntualizza anche l'analisi sullo stato economico dell'Italia, sulle notizie macroeconomiche italiane (inflazione, PIL, manovre di bilancio, debito pubblico).
+Assegna un indice numerico complessivo di Risk-On / Risk-Off da 1 a 90 con decimale a 1 cifra (dove 1 è estremo Risk-On ed euforia, e 90 è estremo Risk-Off con panico/paura).
+Fornisci una breve motivazione in italiano di massimo 5 frasi che spieghi i fattori chiave di mercato, compresa l'economia italiana.
         `.trim();
 
         const response1 = await ai.models.generateContent({
